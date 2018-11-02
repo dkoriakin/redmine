@@ -1,0 +1,99 @@
+variables:
+  POSTGRES_DB: redmine
+  POSTGRES_USER: redmine
+  POSTGRES_PASSWORD: redmine
+  BUNDLE_PATH: redmine-master/gems
+  RAILS_ENV: test
+services:
+  - postgres:9
+ # - mysql:5.5
+  - docker:dind
+  
+stages:
+  - build
+  #- build2
+  - test
+  - push
+  
+build_docker_image:
+    stage: build
+    image: ruby:2.4
+    cache:
+      key: ${CI_COMMIT_REF_SLUG}
+      paths:
+         - vendor/ruby
+    before_script:
+         - apt-get update 
+         - apt-get install -y unzip
+         - unzip redmine-master.zip 
+         - ln -s redmine-master redmine
+         - cd redmine-master
+         - mkdir gems
+    script:
+         - bundle install --path /redmine-master/gems
+    artifacts:
+     paths:
+           - redmine-master
+    tags:
+     - test
+     
+#Build_test_image:
+    # variables:
+         #BUNDLE_PATH: /redmine-master/
+    # stage:  build2
+    # image: docker:git
+    # script:
+    #      - docker login -u $token_user -p $token_pass gitlab.devlits.com:4567
+    #       - docker build -t gitlab.devlits.com:4567/dmitry.koriakin/redmine:test ./test
+    #       - docker push gitlab.devlits.com:4567/dmitry.koriakin/redmine:test
+    # tags:
+    #       - test
+         
+         
+#test_v_docker_image:
+#    variables:
+#      BUNDLE_PATH: /redmine-master/
+#    stage:  test
+#    image: gitlab.devlits.com:4567/dmitry.koriakin/redmine:test
+#    dependencies:
+#           - build_docker_image
+#    script:
+#         - cd redmine-master
+#         - bundle update --all
+#         - RAILS_ENV=test bundle exec rake db:migrate
+#         #- RAILS_ENV=test bundle exec rake test --verbose
+#    tags:
+#     - test
+#     
+#test_s_docker_image:
+#    stage:  test
+#    image: circleci/ruby:2.4
+#    dependencies:
+#           - build_docker_image
+#    script:
+#         - cd redmine-master
+#         - bundle update --all
+#         - RAILS_ENV=test bundle exec rake db:migrate
+         #- RAILS_ENV=test bundle exec rake test:system
+#    tags:
+#     - test2
+
+      
+      
+push_docker_image:
+    stage: push
+    image: docker:git
+    dependencies:
+     - build_docker_image
+    script:
+        - docker login -u $token_user -p $token_pass gitlab.devlits.com:4567
+        - docker build -t gitlab.devlits.com:4567/dmitry.koriakin/redmine:latest .
+        - docker push gitlab.devlits.com:4567/dmitry.koriakin/redmine
+        #- DOCKER_HOST=$SWARM2:2375 docker pull gitlab.devlits.com:4567/dmitry.koriakin/redmine:$CI_JOB_ID
+        #- DOCKER_HOST=$SWARM:2375 docker pull gitlab.devlits.com:4567/dmitry.koriakin/redmine:$CI_JOB_ID
+        #- DOCKER_HOST=$SWARM3:2375 docker pull gitlab.devlits.com:4567/dmitry.koriakin/redmine:$CI_JOB_ID
+        #- DOCKER_HOST=$SWARM:2375 docker service update  --image gitlab.devlits.com:4567/dmitry.koriakin/redmine:$CI_JOB_ID redmine
+        #- DOCKER_HOST=$SWARM:2375 docker service rm redmine
+        #- DOCKER_HOST=$SWARM:2375 docker service create --name redmine --network test-net --publish 3000:3000 --with-registry-auth --image gitlab.devlits.com:4567/dmitry.koriakin/redmine:$CI_JOB_ID 
+    tags:
+     - test
